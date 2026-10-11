@@ -1,0 +1,514 @@
+<!doctype html>
+<!--
+  JQL Helper
+  ==========
+  A one-page tool that builds Jira JQL queries from dropdowns.
+
+  This single file has three parts:
+    1. <style>  (CSS)        - how the page looks: colors, spacing, layout.
+    2. <body>   (HTML)       - what's on the page: the dropdowns and buttons.
+    3. <script> (JavaScript) - what the page does: builds the query when you
+                               change a dropdown, copies it, opens Jira.
+
+  To change a dropdown's choices, edit the <option> lines in the HTML part.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JQL Helper</title>
+
+<style>
+  /* ---------- Colors ---------- */
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #172b4d;
+    --muted: #5e6c84;
+    --border: #dfe1e6;
+    --accent: #0c66e4;
+    --code-bg: #f1f2f4;
+    --danger: #c9372c;
+    --danger-hover: #fff0ee;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d2125;
+      --card: #22272b;
+      --text: #dee4ea;
+      --muted: #9fadbc;
+      --border: #38414a;
+      --accent: #579dff;
+      --code-bg: #161a1d;
+      --danger: #f87168;
+      --danger-hover: #3d1a18;
+    }
+  }
+
+  /* ---------- Page layout ---------- */
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 40px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  p.sub { margin: 0 0 24px; color: var(--muted); }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 520px) { .filters { grid-template-columns: 1fr; } }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  select, input {
+    font: inherit;
+    font-weight: 400;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    width: 100%;
+  }
+
+  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .site {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+
+  /* ---------- Query output ---------- */
+  .output { margin-top: 24px; }
+
+  .output-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .output-head h2 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  button.small { padding: 4px 10px; font-size: 12px; }
+  button.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+  button.danger:hover:not(:disabled) { background: var(--danger-hover); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  pre {
+    margin: 0;
+    padding: 14px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .empty { color: var(--muted); font-style: italic; }
+
+  /* ---------- Saved queries ---------- */
+  .saved {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .saved-heading {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .save-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .save-row input { flex: 1; }
+
+  .saved-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .saved-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .saved-name {
+    font-size: 14px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .saved-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .saved-empty { color: var(--muted); font-size: 14px; font-style: italic; }
+</style>
+</head>
+
+<body>
+<main>
+  <h1>JQL Helper</h1>
+  <p class="sub">Pick filters to build a Jira JQL query.</p>
+
+  <div class="filters">
+    <label>Project
+      <select id="project">
+        <option value="">Any</option>
+        <option>ABC</option>
+        <option>XYZ</option>
+      </select>
+    </label>
+
+    <label>Issue type
+      <select id="issuetype">
+        <option value="">Any</option>
+        <option>Bug</option>
+        <option>Story</option>
+        <option>Task</option>
+        <option>Epic</option>
+        <option>Sub-task</option>
+      </select>
+    </label>
+
+    <label>Status
+      <select id="status">
+        <option value="">Any</option>
+        <option value='status = "To Do"'>To Do</option>
+        <option value='status = "In Progress"'>In Progress</option>
+        <option value='status = "In Review"'>In Review</option>
+        <option value="status = Done">Done</option>
+        <option value="statusCategory != Done">Not done</option>
+      </select>
+    </label>
+
+    <label>Priority
+      <select id="priority">
+        <option value="">Any</option>
+        <option>Highest</option>
+        <option>High</option>
+        <option>Medium</option>
+        <option>Low</option>
+        <option>Lowest</option>
+      </select>
+    </label>
+
+    <label>Assignee
+      <select id="assignee">
+        <option value="">Anyone</option>
+        <option value="assignee = currentUser()">Me</option>
+        <option value="assignee is EMPTY">Unassigned</option>
+        <option value="(assignee != currentUser() OR assignee is EMPTY)">Not me</option>
+      </select>
+    </label>
+
+    <label>Date
+      <select id="date">
+        <option value="">Any time</option>
+        <option value="created >= -7d">Created in last 7 days</option>
+        <option value="created >= -30d">Created in last 30 days</option>
+        <option value="updated >= -7d">Updated in last 7 days</option>
+        <option value="updated >= -30d">Updated in last 30 days</option>
+        <option value="updated &lt;= -14d">Not updated in 14 days</option>
+      </select>
+    </label>
+
+    <label>Sort by
+      <select id="sort">
+        <option value="">Jira default</option>
+        <option value="created DESC">Newest first</option>
+        <option value="created ASC">Oldest first</option>
+        <option value="updated DESC">Recently updated</option>
+        <option value="priority DESC">Highest priority first</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="site">
+    <label>Jira address
+      <input id="site" type="url" placeholder="https://yourcompany.atlassian.net">
+      <span class="hint">Needed for "Open in Jira". Your browser remembers it on this computer.</span>
+    </label>
+  </div>
+
+  <section class="output">
+    <div class="output-head">
+      <h2>Query</h2>
+      <div class="actions">
+        <button type="button" class="secondary" id="reset">Reset</button>
+        <button type="button" class="secondary" id="open">Open in Jira</button>
+        <button type="button" id="copy">Copy</button>
+      </div>
+    </div>
+    <pre id="query"></pre>
+  </section>
+
+  <section class="saved">
+    <h2 class="saved-heading">Saved queries</h2>
+    <div class="save-row">
+      <input id="qname" type="text" placeholder="Name this query…" maxlength="80" aria-label="Query name">
+      <button type="button" id="save-btn">Save</button>
+    </div>
+    <ul class="saved-list" id="saved-list"></ul>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const dropdowns = ["project", "issuetype", "status", "priority", "assignee", "date", "sort"];
+
+  // ---------- Building the query ----------
+
+  function buildQuery() {
+    const filters = [];
+
+    if ($("project").value)   filters.push(`project = "${$("project").value}"`);
+    if ($("issuetype").value) filters.push(`issuetype = "${$("issuetype").value}"`);
+    if ($("priority").value)  filters.push(`priority = "${$("priority").value}"`);
+
+    if ($("status").value)   filters.push($("status").value);
+    if ($("assignee").value) filters.push($("assignee").value);
+    if ($("date").value)     filters.push($("date").value);
+
+    let query = filters.join(" AND ");
+
+    if ($("sort").value) {
+      query += (query ? " " : "") + "ORDER BY " + $("sort").value;
+    }
+
+    return query;
+  }
+
+  function jiraAddress() {
+    let site = $("site").value.trim().replace(/\/+$/, "");
+    if (site && !/^https?:\/\//.test(site)) site = "https://" + site;
+    return site;
+  }
+
+  // ---------- Updating the page ----------
+
+  function render() {
+    const query = buildQuery();
+    const box = $("query");
+
+    box.textContent = query || "Pick at least one filter above.";
+    box.classList.toggle("empty", !query);
+
+    $("copy").disabled = !query;
+    $("open").disabled = !query || !jiraAddress();
+    $("open").title = jiraAddress() ? "" : "Enter your Jira address first";
+    $("save-btn").disabled = !query;
+  }
+
+  dropdowns.forEach((id) => $(id).addEventListener("change", render));
+
+  // ---------- Remembering the Jira address ----------
+  try { $("site").value = localStorage.getItem("jqlHelperSite") || ""; } catch {}
+
+  $("site").addEventListener("input", () => {
+    try { localStorage.setItem("jqlHelperSite", $("site").value.trim()); } catch {}
+    render();
+  });
+
+  // ---------- Buttons ----------
+
+  $("reset").addEventListener("click", () => {
+    dropdowns.forEach((id) => { $(id).value = ""; });
+    render();
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const button = $("copy");
+    try {
+      await navigator.clipboard.writeText(buildQuery());
+      button.textContent = "Copied!";
+    } catch {
+      button.textContent = "Copy failed";
+    }
+    setTimeout(() => { button.textContent = "Copy"; }, 1500);
+  });
+
+  $("open").addEventListener("click", () => {
+    const url = jiraAddress() + "/issues/?jql=" + encodeURIComponent(buildQuery());
+    window.open(url, "_blank", "noopener");
+  });
+
+  // ---------- Saved queries ----------
+
+  const STORAGE_KEY = "jqlHelperSaved";
+
+  const EXAMPLES = [
+    {
+      name: "Open critical bugs",
+      state: { project: "", issuetype: "Bug", status: "statusCategory != Done",
+               priority: "Highest", assignee: "", date: "", sort: "priority DESC" }
+    },
+    {
+      name: "Bugs raised in last 7 days",
+      state: { project: "", issuetype: "Bug", status: "", priority: "",
+               assignee: "", date: "created >= -7d", sort: "created DESC" }
+    },
+    {
+      name: "Items not updated for 14 days",
+      state: { project: "", issuetype: "", status: "statusCategory != Done",
+               priority: "", assignee: "", date: "updated <= -14d", sort: "" }
+    }
+  ];
+
+  function getSavedList() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+  }
+
+  function putSavedList(list) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+  }
+
+  function getState() {
+    const s = {};
+    dropdowns.forEach(id => { s[id] = $(id).value; });
+    return s;
+  }
+
+  function setState(state) {
+    dropdowns.forEach(id => { if (id in state) $(id).value = state[id]; });
+    render();
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderSavedList() {
+    const list = getSavedList();
+    const ul = $("saved-list");
+    if (!list.length) {
+      ul.innerHTML = '<li class="saved-empty">No saved queries yet.</li>';
+      return;
+    }
+    ul.innerHTML = list.map((q, i) => `
+      <li class="saved-item">
+        <span class="saved-name" title="${esc(q.name)}">${esc(q.name)}</span>
+        <div class="saved-actions">
+          <button type="button" class="secondary small" data-action="load" data-idx="${i}">Load</button>
+          <button type="button" class="small danger" data-action="delete" data-idx="${i}">Delete</button>
+        </div>
+      </li>`).join("");
+  }
+
+  // Seed examples on first visit (guarded for private-browsing where localStorage throws)
+  try {
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      putSavedList(EXAMPLES.map(e => ({ name: e.name, state: e.state })));
+    }
+  } catch {}
+
+  $("save-btn").addEventListener("click", () => {
+    const name = $("qname").value.trim();
+    if (!name) {
+      $("qname").focus();
+      $("qname").placeholder = "Give it a name first…";
+      setTimeout(() => { $("qname").placeholder = "Name this query…"; }, 2000);
+      return;
+    }
+    const list = getSavedList();
+    list.push({ name, state: getState() });
+    putSavedList(list);
+    $("qname").value = "";
+    renderSavedList();
+  });
+
+  // Submit name field with Enter
+  $("qname").addEventListener("keydown", e => { if (e.key === "Enter") $("save-btn").click(); });
+
+  // Load / Delete via event delegation on the list
+  $("saved-list").addEventListener("click", e => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const idx = +btn.dataset.idx;
+    const list = getSavedList();
+    if (btn.dataset.action === "load") {
+      setState(list[idx].state);
+      btn.textContent = "Loaded!";
+      setTimeout(() => { btn.textContent = "Load"; }, 1500);
+    } else if (btn.dataset.action === "delete") {
+      list.splice(idx, 1);
+      putSavedList(list);
+      renderSavedList();
+    }
+  });
+
+  renderSavedList();
+  render();
+</script>
+</body>
+</html>
