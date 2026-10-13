@@ -17,32 +17,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JQL Helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  /* ---------- Colors ---------- */
+  /* ---------- Colors (TELUS Health One) ---------- */
   :root {
-    --bg: #f6f7f9;
+    --bg: #F5F5F5;
     --card: #ffffff;
-    --text: #172b4d;
-    --muted: #5e6c84;
-    --border: #dfe1e6;
-    --accent: #0c66e4;
-    --code-bg: #f1f2f4;
-    --danger: #c9372c;
-    --danger-hover: #fff0ee;
+    --text: #000000;
+    --muted: #555555;
+    --border: #D0D0D0;
+    --accent: #491F6A;
+    --code-bg: #ffffff;
+    --danger: #C9372C;
+    --danger-hover: #FFF0EE;
+    --disabled-bg: #E0E0E0;
+    --disabled-text: #909090;
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1d2125;
-      --card: #22272b;
-      --text: #dee4ea;
-      --muted: #9fadbc;
-      --border: #38414a;
-      --accent: #579dff;
-      --code-bg: #161a1d;
-      --danger: #f87168;
-      --danger-hover: #3d1a18;
+      --bg: #1C1C1E;
+      --card: #2C2C2E;
+      --text: #FFFFFF;
+      --muted: #ABABAB;
+      --border: #444444;
+      --accent: #9B6DC5;
+      --code-bg: #2C2C2E;
+      --danger: #F87168;
+      --danger-hover: #3D1A18;
+      --disabled-bg: #3A3A3C;
+      --disabled-text: #666666;
     }
   }
 
@@ -54,7 +61,7 @@
     padding: 40px 16px;
     background: var(--bg);
     color: var(--text);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 15px/1.5 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
   }
 
   main {
@@ -62,12 +69,13 @@
     margin: 0 auto;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 28px;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 
-  h1 { margin: 0 0 4px; font-size: 22px; }
-  p.sub { margin: 0 0 24px; color: var(--muted); }
+  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  p.sub { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
 
   .filters {
     display: grid;
@@ -88,15 +96,20 @@
   select, input {
     font: inherit;
     font-weight: 400;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
     background: var(--card);
     color: var(--text);
     width: 100%;
+    transition: border-color 0.15s;
   }
 
-  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+  }
 
   .site {
     margin-top: 20px;
@@ -130,28 +143,33 @@
   button {
     font: inherit;
     font-size: 13px;
-    padding: 6px 12px;
-    border: 1px solid var(--accent);
-    border-radius: 6px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border: 1.5px solid var(--accent);
+    border-radius: 8px;
     background: var(--accent);
     color: #fff;
     cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
   }
+  button:hover:not(:disabled) { background: #3A165A; box-shadow: 0 2px 8px rgba(73,31,106,0.18); }
   button.secondary { background: transparent; color: var(--accent); }
+  button.secondary:hover:not(:disabled) { background: rgba(73,31,106,0.06); box-shadow: none; }
   button.small { padding: 4px 10px; font-size: 12px; }
   button.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
-  button.danger:hover:not(:disabled) { background: var(--danger-hover); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.danger:hover:not(:disabled) { background: var(--danger-hover); box-shadow: none; }
+  button:disabled { opacity: 1; background: var(--disabled-bg); border-color: var(--disabled-bg); color: var(--disabled-text); cursor: not-allowed; }
+  button.secondary:disabled { background: transparent; border-color: var(--disabled-bg); color: var(--disabled-text); }
 
   pre {
     margin: 0;
-    padding: 14px;
+    padding: 14px 16px;
     background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
     white-space: pre-wrap;
     word-break: break-word;
-    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   .empty { color: var(--muted); font-style: italic; }
 
@@ -192,10 +210,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 10px 14px;
     background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
   }
 
   .saved-name {
