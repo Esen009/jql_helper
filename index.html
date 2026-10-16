@@ -115,6 +115,9 @@
     margin-top: 20px;
     padding-top: 20px;
     border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
   .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
 
@@ -233,18 +236,10 @@
 
 <body>
 <main>
-  <h1>JQL Helper</h1>
+  <h1>JQL Helper.</h1>
   <p class="sub">Pick filters to build a Jira JQL query.</p>
 
   <div class="filters">
-    <label>Project
-      <select id="project">
-        <option value="">Any</option>
-        <option>ABC</option>
-        <option>XYZ</option>
-      </select>
-    </label>
-
     <label>Issue type
       <select id="issuetype">
         <option value="">Any</option>
@@ -310,6 +305,11 @@
   </div>
 
   <div class="site">
+    <label>Project key
+      <input id="projectkey" type="text" placeholder="e.g. ABC"
+             autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <span class="hint">Loads live issue types, statuses, and priorities from your local Jira server.</span>
+    </label>
     <label>Jira address
       <input id="site" type="url" placeholder="https://yourcompany.atlassian.net">
       <span class="hint">Needed for "Open in Jira". Your browser remembers it on this computer.</span>
@@ -341,14 +341,21 @@
 <script>
   const $ = (id) => document.getElementById(id);
 
-  const dropdowns = ["project", "issuetype", "status", "priority", "assignee", "date", "sort"];
+  const dropdowns = ["issuetype", "status", "priority", "assignee", "date", "sort"];
+
+  // Snapshot hardcoded defaults so loadFromServer() can restore them on fallback.
+  const defaultOptions = {};
+  ["issuetype", "status", "priority"].forEach(id => {
+    defaultOptions[id] = $(id).innerHTML;
+  });
 
   // ---------- Building the query ----------
 
   function buildQuery() {
     const filters = [];
 
-    if ($("project").value)   filters.push(`project = "${$("project").value}"`);
+    const pk = $("projectkey").value.trim();
+    if (pk)                   filters.push(`project = "${pk}"`);
     if ($("issuetype").value) filters.push(`issuetype = "${$("issuetype").value}"`);
     if ($("priority").value)  filters.push(`priority = "${$("priority").value}"`);
 
@@ -387,6 +394,65 @@
   }
 
   dropdowns.forEach((id) => $(id).addEventListener("change", render));
+
+  // ---------- Dynamic dropdowns ----------
+
+  function populateDropdown(id, items, valueMapper, labelMapper) {
+    const sel = $(id);
+    const prev = sel.value;
+    const anyOpt = sel.options[0].outerHTML;
+    sel.innerHTML = anyOpt;
+    items.forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = valueMapper(name);
+      opt.textContent = labelMapper(name);
+      sel.appendChild(opt);
+    });
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
+
+  function resetToDefaults() {
+    ["issuetype", "status", "priority"].forEach(id => {
+      const sel = $(id);
+      const prev = sel.value;
+      sel.innerHTML = defaultOptions[id];
+      if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+    });
+  }
+
+  let currentController = null;
+
+  async function loadFromServer() {
+    if (currentController) currentController.abort();
+    const key = $("projectkey").value.trim();
+    if (!key) { resetToDefaults(); render(); return; }
+
+    currentController = new AbortController();
+    setTimeout(() => currentController.abort(), 2000);
+
+    try {
+      const res = await fetch(
+        `/api/meta?project=${encodeURIComponent(key)}`,
+        { signal: currentController.signal }
+      );
+      if (!res.ok) throw new Error();
+      const { issueTypes, statuses, priorities } = await res.json();
+      populateDropdown("issuetype", issueTypes, n => n, n => n);
+      populateDropdown("status",    statuses,   n => `status = "${n}"`, n => n);
+      populateDropdown("priority",  priorities, n => n, n => n);
+    } catch {
+      resetToDefaults();
+    }
+    render();
+  }
+
+  // ---------- Project key ----------
+  try { $("projectkey").value = localStorage.getItem("jqlHelperProject") || ""; } catch {}
+  $("projectkey").addEventListener("input", render);
+  $("projectkey").addEventListener("change", () => {
+    try { localStorage.setItem("jqlHelperProject", $("projectkey").value.trim()); } catch {}
+    loadFromServer();
+  });
 
   // ---------- Remembering the Jira address ----------
   try { $("site").value = localStorage.getItem("jqlHelperSite") || ""; } catch {}
@@ -526,7 +592,7 @@
   });
 
   renderSavedList();
-  render();
+  loadFromServer();
 </script>
 </body>
 </html>
